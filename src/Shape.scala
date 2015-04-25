@@ -3,22 +3,22 @@ sealed trait Shape {
 
   def intersect(ray: Ray): List[Vector]
 
-  def shine: Float
+  def shine: Double
 
-  def reflect: Float = shine
+  def reflect: Double = shine
 
-  def specular: Float = shine
+  def specular: Double = shine
 
-  def color: Color
+  def colour: Colour
 }
 
-case class Sphere(val center: Vector, val radius: Float, val color: Color, val shine: Float) extends Shape {
+case class Sphere(val center: Vector, val radius: Double, val colour: Colour, val shine: Double) extends Shape {
 
   // normal vector at point v on surface of the sphere
-  def normal(v: Vector): Vector = (v - center).normalized
+  override def normal(v: Vector): Vector = (v - center).normalized
 
-  def intersect(ray: Ray): List[Vector] = {
-    // vector to the center
+  override def intersect(ray: Ray): List[Vector] = {
+    // Vector to the center
     val vc = center - ray.orig
 
     // The ray is ray.orig + t * ray.dir
@@ -39,10 +39,9 @@ case class Sphere(val center: Vector, val radius: Float, val color: Color, val s
     val t0 = (-B + d) / (2.0 * A)
     val t1 = (-B - d) / (2.0 * A)
 
-    val p0 = ray.orig + ray.dir * t0.toFloat
-    val p1 = ray.orig + ray.dir * t1.toFloat
+    val p0 = ray.orig + ray.dir * t0
+    val p1 = ray.orig + ray.dir * t1
 
     List(p0, p1)
   }
 }
-

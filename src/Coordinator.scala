@@ -1,33 +1,24 @@
-import scala.actors.Actor
+// TODO
+//
+// Make this an actor and write a message handler for at least the
+// set method.
+//
+object Coordinator {
+  def init(im: Image, of: String) = {
+    image = im
+    outfile = of
+    waiting = im.width * im.height
+  }
 
-// messages to Coordinator
-case class Set(x: Int, y: Int, color: Color)
-
-object Coordinator extends Actor {
   // Number of pixels we're waiting for to be set.
   var waiting = 0
   var outfile: String = null
   var image: Image = null
 
-  def init(im: Image, of: String) = {
-    image = im
-    outfile = of
-    waiting = image.width * image.height
-  }
-
-  def act {
-    loop {
-      react {
-        case Set(x, y, c) => {
-          image(x, y) = c
-          waiting -= 1
-          if (waiting == 0) {
-            print
-            exit
-          }
-        }
-      }
-    }
+  // TODO: make set a message
+  def set(x: Int, y: Int, c: Colour) = {
+    image(x, y) = c
+    waiting -= 1
   }
 
   def print = {

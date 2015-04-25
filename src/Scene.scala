@@ -1,6 +1,8 @@
 object Scene {
 
-  import java.io._
+  import java.io.{FileReader, LineNumberReader}
+
+  import scala.annotation.tailrec
 
   def fromFile(file: String) = {
     val in = new LineNumberReader(new FileReader(file))
@@ -8,7 +10,7 @@ object Scene {
     new Scene(objects, lights)
   }
 
-  @annotation.tailrec
+  @tailrec
   private def readLines(in: LineNumberReader, objects: List[Shape], lights: List[Light]): (List[Shape], List[Light]) = {
     val line = in.readLine
     if (line == null) {
@@ -23,10 +25,10 @@ object Scene {
       fields.headOption match {
         case Some("sphere") =>
           val Array(x, y, z, rad, r, g, b, shine) = fields.tail.map(_.toFloat)
-          readLines(in, Sphere(Vector(x, y, z), rad, Color(r, g, b), shine) :: objects, lights)
+          readLines(in, Sphere(Vector(x, y, z), rad, Colour(r, g, b), shine) :: objects, lights)
         case Some("light") =>
           val Array(x, y, z, r, g, b) = fields.tail.map(_.toFloat)
-          readLines(in, objects, Light(Vector(x, y, z), Color(r, g, b)) :: lights)
+          readLines(in, objects, Light(Vector(x, y, z), Colour(r, g, b)) :: lights)
         case None =>
           // blank line
           readLines(in, objects, lights)
@@ -38,20 +40,15 @@ object Scene {
 }
 
 class Scene private(val objects: List[Shape], val lights: List[Light]) {
+
   private def this(p: (List[Shape], List[Light])) = this(p._1, p._2)
 
-  val AntiAliasingFactor = 4
-  var rayCount = 0
-  var hitCount = 0
-  var lightCount = 0
-  var darkCount = 0
-
-  val ambient = 0f
-  val background = Color.black
+  val ambient = .2f
+  val background = Colour.black
 
   val eye = Vector.origin
   val angle = 90f // viewing angle
-  // val angle = 180f // fisheye
+  //val angle = 180f // fisheye
 
   def traceImage(width: Int, height: Int) {
 
@@ -60,60 +57,44 @@ class Scene private(val objects: List[Shape], val lights: List[Light]) {
     val cosf = math.cos(frustum)
     val sinf = math.sin(frustum)
 
-    // Anti-aliasing parameter -- divide each pixel into subpixels and
+    // Anti-aliasing parameter -- divide each pixel into sub-pixels and
     // average the results to get smoother images.
-    val ss = AntiAliasingFactor
+    val ss = Trace.AntiAliasingFactor
 
     // TODO:
-    // Parallelise this loop, creating one actor per pixel or per row of
+    // Create a parallel version of this loop, creating one actor per pixel or per row of
     // pixels.  Each actor should send the Coordinator messages to set the
     // color of a pixel.  The actor need not receive any messages.
 
-    import scala.actors.Actor._
-
     for (y <- 0 until height) {
-      // Make each row an actor
-      val tracer = actor {
-        for (x <- 0 until width) {
+      for (x <- 0 until width) {
 
-          // This loop body can be sequential.
-          var color = Color.black
+        // This loop body can be sequential.
+        var colour = Colour.black
 
-          for (dx <- 0 until ss) {
-            for (dy <- 0 until ss) {
+        for (dx <- 0 until ss) {
+          for (dy <- 0 until ss) {
 
-              // Create a vector to the pixel on the view plane formed when
-              // the eye is at the origin and the normal is the Z-axis.
-              val dir = Vector(
-                (sinf * 2 * ((x + dx.toFloat / ss) / width - .5)).toFloat,
-                (sinf * 2 * (height.toFloat / width) * (.5 - (y + dy.toFloat / ss) / height)).toFloat,
-                cosf.toFloat).normalized
+            // Create a vector to the pixel on the view plane formed when
+            // the eye is at the origin and the normal is the Z-axis.
+            val dir = Vector(
+              (sinf * 2 * ((x + dx.toFloat / ss) / width - .5)).toFloat,
+              (sinf * 2 * (height.toFloat / width) * (.5 - (y + dy.toFloat / ss) / height)).toFloat,
+              cosf.toFloat).normalized
 
-              /*
-              if ((x == 0 && dx == 0 || x == width-1 && dx == ss-1) &&
-                  (y == 0 && dy == 0 || y == height-1 && dy == ss-1))
-                println((x,y) + " " + dir)
-                */
-
-              val c = trace(Ray(eye, dir)) / (ss * ss)
-              color += c
-            }
+            val c = trace(Ray(eye, dir)) / (ss * ss)
+            colour += c
           }
-
-          if (Vector(color.r, color.g, color.b).norm < 1)
-            darkCount += 1
-          if (Vector(color.r, color.g, color.b).norm > 1)
-            lightCount += 1
-
-          Coordinator ! Set(x, y, color)
         }
+
+        if (Vector(colour.r, colour.g, colour.b).norm < 1)
+          Trace.darkCount += 1
+        if (Vector(colour.r, colour.g, colour.b).norm > 1)
+          Trace.lightCount += 1
+
+        Coordinator.set(x, y, colour)
       }
-      tracer.start
     }
-    println("rays cast " + rayCount)
-    println("rays hit " + hitCount)
-    println("light " + lightCount)
-    println("dark " + darkCount)
   }
 
   def shadow(ray: Ray, l: Light): Boolean = {
@@ -127,20 +108,20 @@ class Scene private(val objects: List[Shape], val lights: List[Light]) {
   }
 
   // Compute the color contributed by light l at point v on object o.
-  def shade(ray: Ray, l: Light, v: Vector, o: Shape): Color = {
+  def shade(ray: Ray, l: Light, v: Vector, o: Shape): Colour = {
     val toLight = Ray(v, (l.loc - v).normalized)
 
     val N = o.normal(v)
 
     // Diffuse light
     if (shadow(toLight, l) || (N dot toLight.dir) < 0)
-      Color.black
+      Colour.black
     else {
       // diffuse light
-      val diffuse = o.color * (N dot toLight.dir)
+      val diffuse = o.colour * (N dot toLight.dir)
 
-      // println("ray " + ray)
-      // println("diffuse " + diffuse)
+      println("ray " + ray)
+      println("diffuse " + diffuse)
 
       // specular light
       val R = reflected(-toLight.dir, N)
@@ -155,19 +136,19 @@ class Scene private(val objects: List[Shape], val lights: List[Light]) {
 
         if (power > 1e-12) {
           val scale = o.reflect * power
-          l.color * o.specular * scale
+          l.colour * o.specular * scale
         }
         else
-          Color.black
+          Colour.black
       }
       else
-        Color.black
+        Colour.black
 
-      // println("specular " + specular)
+      println("specular " + specular)
 
       val color = diffuse + specular
 
-      // println("color " + color + " 0x" + color.rgb.toHexString)
+      println("color " + color + " 0x" + color.rgb.toHexString)
 
       color
     }
@@ -176,7 +157,7 @@ class Scene private(val objects: List[Shape], val lights: List[Light]) {
   def reflected(v: Vector, N: Vector): Vector = v - (N * 2.0f * (v dot N))
 
   def intersections(ray: Ray) = objects.flatMap {
-    o => o.intersect(ray).map { v => (v, o) }
+    o => o.intersect(ray).map { v => (v, o)}
   }
 
   def closestIntersection(ray: Ray) = intersections(ray).sortWith {
@@ -189,10 +170,10 @@ class Scene private(val objects: List[Shape], val lights: List[Light]) {
 
   val maxDepth = 3
 
-  def trace(ray: Ray): Color = trace(ray, maxDepth)
+  def trace(ray: Ray): Colour = trace(ray, maxDepth)
 
-  private def trace(ray: Ray, depth: Int): Color = {
-    rayCount += 1
+  private def trace(ray: Ray, depth: Int): Colour = {
+    Trace.rayCount += 1
 
     // Compute the intersections of the ray with every object, sort by
     // distance from the ray's origin and pick the closest to the origin.
@@ -206,15 +187,15 @@ class Scene private(val objects: List[Shape], val lights: List[Light]) {
       case Some((v, o)) => {
         // Compute the color as the sum of:
 
-        hitCount += 1
+        Trace.hitCount += 1
 
         // The contribution of each point light source.
-        var c = lights.foldLeft(Color.black) {
+        var c = lights.foldLeft(Colour.black) {
           case (c, l) => c + shade(ray, l, v, o)
         }
 
         // The contribution of the ambient light.
-        c += o.color * ambient
+        c += o.colour * ambient
 
         // Return the color.
         c
