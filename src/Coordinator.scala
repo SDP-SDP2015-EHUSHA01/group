@@ -1,3 +1,5 @@
+import akka.actor.Actor;
+
 // TODO
 //
 // Make this an actor and write a message handler for at least the
@@ -24,5 +26,14 @@ object Coordinator {
   def print = {
     assert(waiting == 0)
     image.print(outfile)
+  }
+}
+
+class Coordinator extends Actor {
+  def receive = {
+    case (img: Image, output: String) =>
+      Coordinator.init(img, output)
+    case (x: Int, y: Int, c: Colour) =>
+      Coordinator.set(x, y, c)
   }
 }
