@@ -17,7 +17,6 @@ object Coordinator {
   var outfile: String = null
   var image: Image = null
 
-  // TODO: make set a message
   def set(x: Int, y: Int, c: Colour) = {
     image(x, y) = c
     waiting -= 1

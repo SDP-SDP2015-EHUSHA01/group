@@ -1,3 +1,5 @@
+import akka.actor._;
+
 object Scene {
 
   import java.io.{FileReader, LineNumberReader}
@@ -92,7 +94,11 @@ class Scene private(val objects: List[Shape], val lights: List[Light]) {
         if (Vector(colour.r, colour.g, colour.b).norm > 1)
           Trace.lightCount += 1
 
-        Coordinator.set(x, y, colour)
+        val RayTracerSystem = ActorSystem("RayTracerSystem")
+        val coordinatorActor = RayTracerSystem.actorOf(Props[Coordinator], name = "coordinatorActor")
+        
+        coordinatorActor ! (x, y, colour)
+        
       }
     }
   }

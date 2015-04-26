@@ -41,7 +41,7 @@ object Trace {
     coordinatorActor ! (image, outfile)
     
     
-//    scene.traceImage(width, height)
+    scene.traceImage(width, height)
 
     // TODO:
     // This one is tricky--we can't simply send a message here to print
